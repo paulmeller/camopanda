@@ -18,7 +18,7 @@ Lightpanda connects internally to `proxy:8080`. The proxy generates its CA in th
 
 ## Coolify
 
-Create a Git-backed Docker Compose application using this private repository and `/docker-compose.yml`. Both images build from this repository. Keep the named volumes persistent and leave CDP on loopback.
+Create a Git-backed Docker Compose application using this private repository and `/docker-compose.yaml`. Both images build from this repository. Keep the named volumes persistent and leave CDP on loopback.
 
 From your Mac, tunnel to the server:
 
