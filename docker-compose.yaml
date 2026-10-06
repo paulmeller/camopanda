@@ -21,7 +21,7 @@ services:
     volumes:
       - proxy-trust:/trust:ro
     ports:
-      - "127.0.0.1:${CDP_PORT:-9222}:9222"
+      - "${CDP_BIND_IP:-127.0.0.1}:${CDP_PORT:-9222}:9222"
     restart: unless-stopped
 
 volumes:

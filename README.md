@@ -12,7 +12,7 @@ agent-browser --cdp 9222 open https://example.com
 agent-browser --cdp 9222 snapshot -i
 ```
 
-Set `UPSTREAM_USER_AGENT` in `.env` to override the synthetic Mac Chrome 134 string. Set `CDP_PORT` to change the host port. Restart/recreate the stack after configuration changes.
+Set `UPSTREAM_USER_AGENT` in `.env` to override the synthetic Mac Chrome 134 string. Set `CDP_PORT` to change the host port. `CDP_BIND_IP` defaults to `127.0.0.1`; set it to the server's Tailscale IPv4 address for direct tailnet access. Restart/recreate the stack after configuration changes.
 
 Lightpanda connects internally to `proxy:8080`. The proxy generates its CA in the persistent `proxy-state` volume and publishes only the public certificate into `proxy-trust`, which Lightpanda reads. Upstream TLS certificates are verified. CDP is bound to host loopback; the proxy has no published port. Keep the private CA volume out of source control.
 
