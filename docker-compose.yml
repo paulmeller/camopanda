@@ -1,0 +1,29 @@
+services:
+  proxy:
+    build: ./proxy
+    environment:
+      UPSTREAM_USER_AGENT: "${UPSTREAM_USER_AGENT:-Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36}"
+    volumes:
+      - proxy-state:/state
+      - proxy-trust:/trust
+    healthcheck:
+      test: [CMD, /usr/local/bin/hudsucker-proxy, --healthcheck]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  lightpanda:
+    build: ./lightpanda
+    depends_on:
+      proxy:
+        condition: service_healthy
+    volumes:
+      - proxy-trust:/trust:ro
+    ports:
+      - "127.0.0.1:${CDP_PORT:-9222}:9222"
+    restart: unless-stopped
+
+volumes:
+  proxy-state:
+  proxy-trust:
