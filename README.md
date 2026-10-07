@@ -14,6 +14,8 @@ Use it to test desktop and mobile user-agent responses, check browser-specific s
 
 Requirements: Docker with Docker Compose, and `agent-browser` installed on your computer.
 
+On macOS, [container-compose](https://github.com/paulmeller/container-compose) provides a Compose workflow for Apple's container runtime. See its README for installation and usage.
+
 Install the client with `npm install -g agent-browser`. Camopanda supplies the browser endpoint; the client does not need a local browser for these commands.
 
 ```sh
