@@ -1,5 +1,9 @@
 proxy/target/
 .env
+.env.*
+!.env.example
+*.key
+*.pem
 .runtime/
 *.log
 .DS_Store

@@ -24,7 +24,6 @@ impl HttpHandler for Rewriter {
         _context: &HttpContext,
         mut request: Request<Body>,
     ) -> RequestOrResponse {
-        eprintln!("proxy request: {} {}", request.method(), request.uri());
         rewrite_headers(request.headers_mut(), &self.user_agent)
             .expect("validated user agent changed after startup");
         RequestOrResponse::Request(request)
