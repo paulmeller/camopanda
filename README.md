@@ -10,7 +10,33 @@ Use it to test desktop and mobile user-agent responses, check browser-specific s
 
 **These are request header profiles.** They do not emulate screen size, touch input, browser engines, browser APIs, or TLS fingerprints. Use real browsers and device emulation for visual layout and browser compatibility tests. JavaScript browser properties can still differ from the outgoing headers.
 
-## Quick start
+## Native CLI (macOS and Linux)
+
+Install Lightpanda separately and make it available on `PATH`. The CLI embeds the Hudsucker proxy; Docker and OpenSSL are not required. Build with Rust 1.93 or later:
+
+```sh
+git clone https://github.com/paulmeller/camopanda.git
+cd camopanda
+cargo install --path proxy --locked --bin camopanda
+
+camopanda fetch --dump markdown https://example.com
+camopanda --user-agent "Your test user-agent" fetch --dump html https://httpbin.org/headers
+camopanda serve --host 127.0.0.1 --port 9222
+```
+
+Connect agent-browser to the CLI's `serve` endpoint with the same CDP commands shown below.
+
+Camopanda options go before the Lightpanda command. Subsequent arguments pass through to Lightpanda. `--http-proxy` and `--ca-cert` are reserved for Camopanda. `camopanda help fetch` displays Lightpanda's help. Output and ordinary exit codes pass through unchanged.
+
+Each invocation starts an internal proxy on an available loopback port. Browser exit, Ctrl-C, and SIGTERM stop the browser and proxy. The CLI needs no separate proxy executable.
+
+Certificates persist in `~/Library/Application Support/camopanda` on macOS, or `$XDG_DATA_HOME/camopanda` (default `~/.local/share/camopanda`) on Linux. The combined certificate and private key file has mode `0600`. This storage does not persist browser sessions.
+
+Use `--state-dir PATH` to select another directory, and `--lightpanda PATH` or `LIGHTPANDA_BIN` to select a browser executable. `--user-agent` overrides `UPSTREAM_USER_AGENT`. Telemetry is disabled by default; `LIGHTPANDA_DISABLE_TELEMETRY` controls it. Native CLI settings come from arguments and environment variables; it does not read `.env`.
+
+The CLI currently supports macOS and Linux. Lightpanda upgrades can change available commands and flags. Fetch was tested with the installed browser; not every upstream command has been verified through the wrapper.
+
+## Docker quick start
 
 Requirements: Docker with Docker Compose, and `agent-browser` installed on your computer.
 

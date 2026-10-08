@@ -1,34 +1,17 @@
 use hudsucker::{
-    Body, HttpContext, HttpHandler, Proxy, RequestOrResponse,
+    Proxy,
     certificate_authority::RcgenAuthority,
-    hyper::{Request, header::HeaderValue},
+    hyper::header::HeaderValue,
     rcgen::{Issuer, KeyPair},
     rustls::crypto::aws_lc_rs,
 };
-use lightpanda_hudsucker_proxy::rewrite_headers;
+use lightpanda_hudsucker_proxy::Rewriter;
 use std::{
     env,
     error::Error,
     fs,
     net::{SocketAddr, TcpStream},
 };
-
-#[derive(Clone)]
-struct Rewriter {
-    user_agent: String,
-}
-
-impl HttpHandler for Rewriter {
-    async fn handle_request(
-        &mut self,
-        _context: &HttpContext,
-        mut request: Request<Body>,
-    ) -> RequestOrResponse {
-        rewrite_headers(request.headers_mut(), &self.user_agent)
-            .expect("validated user agent changed after startup");
-        RequestOrResponse::Request(request)
-    }
-}
 
 fn ca_material() -> Result<(String, String), Box<dyn Error>> {
     let key_path = env::var("CA_KEY_PATH").unwrap_or_else(|_| "/state/hudsucker-ca.key".into());
