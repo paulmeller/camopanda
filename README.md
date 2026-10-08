@@ -106,7 +106,7 @@ export SESSION_API_KEY="$(openssl rand -hex 32)"
 docker compose --profile sessions up -d --build
 ```
 
-For a server deployment, set `SESSION_PUBLIC_URL` to the WebSocket origin clients can reach, such as `ws://<server-tailscale-ip>:9223`. Keep `CDP_BIND_IP` restricted to loopback or the server's private address. On Coolify, enable the profile with `COMPOSE_PROFILES=sessions` and configure the session variables below.
+For a server deployment, set `SESSION_PUBLIC_URL` to the WebSocket origin clients can reach, such as `ws://<server-tailscale-ip>:9223`. Keep `CDP_BIND_IP` restricted to loopback or the server's private address. On Coolify, set `COMPOSE_PROFILES=sessions` and make that variable available at **both build time and runtime**. This ensures Coolify builds the optional image before starting it. Keep `SESSION_API_KEY` runtime-only, and configure the session variables below.
 
 ### Native
 
