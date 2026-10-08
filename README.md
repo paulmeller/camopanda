@@ -81,6 +81,16 @@ docker compose up -d --force-recreate
 
 All requests through this stack use the configured profile. The profile is shared across clients; it is not a per-session setting.
 
+An experimental CDP interception test checks whether separate connections can tag navigation, redirects, scripts, and fetch requests independently. It does not enable profile selection in the deployed proxy. With Node.js 22+ and Lightpanda installed, run:
+
+```sh
+node scripts/profile-spike.mjs
+cargo build --manifest-path proxy/Cargo.toml --locked --bin camopanda
+USE_PROXY=1 node scripts/profile-spike.mjs
+```
+
+The fixture runs locally. Its test marker deliberately reaches the fixture so that the test can verify it. A production profile gateway would need to remove that marker at the proxy and handle client CDP interception commands.
+
 To inspect outgoing headers with a public echo service:
 
 ```sh
