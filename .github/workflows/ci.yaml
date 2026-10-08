@@ -15,3 +15,20 @@ jobs:
       - run: cargo fmt --manifest-path proxy/Cargo.toml --check
       - run: sh -n proxy/entrypoint.sh lightpanda/entrypoint.sh
       - run: docker compose config --quiet
+      - run: docker compose --profile sessions config --quiet
+  sessions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install upstream Lightpanda nightly
+        run: |
+          curl --fail --location --output "$RUNNER_TEMP/lightpanda" https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-x86_64-linux
+          chmod +x "$RUNNER_TEMP/lightpanda"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - run: cargo build --manifest-path proxy/Cargo.toml --locked --bins
+      - run: node scripts/session-smoke.mjs
+      - run: docker build -f sessions/Dockerfile -t camopanda-sessions:test .

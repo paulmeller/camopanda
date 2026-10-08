@@ -1,3 +1,5 @@
+pub mod sessions;
+
 use hudsucker::hyper::header::{HeaderMap, HeaderValue, InvalidHeaderValue};
 
 pub fn rewrite_headers(
@@ -8,7 +10,9 @@ pub fn rewrite_headers(
     headers.insert("user-agent", user_agent);
     let client_hints: Vec<_> = headers
         .keys()
-        .filter(|name| name.as_str().starts_with("sec-ch-ua"))
+        .filter(|name| {
+            name.as_str().starts_with("sec-ch-ua") || name.as_str().starts_with("x-camopanda-")
+        })
         .cloned()
         .collect();
     for name in client_hints {

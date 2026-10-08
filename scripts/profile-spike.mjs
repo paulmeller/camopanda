@@ -136,7 +136,7 @@ try {
     for (const path of ['/redirect', '/page', '/script', '/fetch']) {
       const matches = records.filter(record => record.profile === profile && record.path === path);
       assert(matches.length > 0, `missing ${path} for ${profile}`);
-      for (const record of matches) assert.equal(record.marker, profile);
+      for (const record of matches) assert.equal(record.marker, proxyMode ? undefined : profile);
     }
   }
   console.log(JSON.stringify({ mode: proxyMode ? 'proxy' : 'direct', version, records, events, passed: true }, null, 2));

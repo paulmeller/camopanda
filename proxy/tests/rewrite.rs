@@ -11,6 +11,7 @@ fn replaces_user_agent_and_removes_every_client_hint_header() {
         HeaderValue::from_static("Lightpanda/1.1"),
     );
     headers.insert("accept", HeaderValue::from_static("text/html"));
+    headers.insert("x-camopanda-profile", HeaderValue::from_static("private"));
 
     rewrite_headers(&mut headers, "FetchTest/2.0").unwrap();
 
@@ -21,6 +22,7 @@ fn replaces_user_agent_and_removes_every_client_hint_header() {
             .any(|name| name.as_str().starts_with("sec-ch-ua"))
     );
     assert_eq!(headers["accept"], "text/html");
+    assert!(!headers.contains_key("x-camopanda-profile"));
 }
 
 #[test]

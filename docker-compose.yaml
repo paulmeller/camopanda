@@ -26,6 +26,30 @@ services:
       - "${CDP_BIND_IP:-127.0.0.1}:${CDP_PORT:-9222}:9222"
     restart: unless-stopped
 
+  sessions:
+    profiles: [sessions]
+    build:
+      context: .
+      dockerfile: sessions/Dockerfile
+    init: true
+    environment:
+      SESSION_API_KEY: "${SESSION_API_KEY:-}"
+      SESSION_PUBLIC_URL: "${SESSION_PUBLIC_URL:-ws://127.0.0.1:9223}"
+      SESSION_MAX_SESSIONS: "${SESSION_MAX_SESSIONS:-4}"
+      SESSION_IDLE_SECS: "${SESSION_IDLE_SECS:-300}"
+      LIGHTPANDA_DISABLE_TELEMETRY: "${LIGHTPANDA_DISABLE_TELEMETRY:-true}"
+    volumes:
+      - session-state:/state
+    ports:
+      - "${CDP_BIND_IP:-127.0.0.1}:${SESSION_PORT:-9223}:9223"
+    healthcheck:
+      test: [CMD, /usr/local/bin/camopanda-gateway, --healthcheck]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
 volumes:
   proxy-state:
   proxy-trust:
+  session-state:

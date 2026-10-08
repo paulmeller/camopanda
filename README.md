@@ -79,7 +79,7 @@ Apply the configuration, then repeat your navigation or fetch test:
 docker compose up -d --force-recreate
 ```
 
-All requests through this stack use the configured profile. The profile is shared across clients; it is not a per-session setting.
+All requests through the default CDP endpoint use the configured profile. That endpoint shares one profile across clients. The optional session API below provides isolated profiles.
 
 An experimental CDP interception test checks whether separate connections can tag navigation, redirects, scripts, and fetch requests independently. It does not enable profile selection in the deployed proxy. With Node.js 22+ and Lightpanda installed, run:
 
@@ -89,7 +89,90 @@ cargo build --manifest-path proxy/Cargo.toml --locked --bin camopanda
 USE_PROXY=1 node scripts/profile-spike.mjs
 ```
 
-The fixture runs locally. Its test marker deliberately reaches the fixture so that the test can verify it. A production profile gateway would need to remove that marker at the proxy and handle client CDP interception commands.
+The fixture runs locally. Direct Lightpanda requests carry the test marker; the proxy test checks that Camopanda strips it. This experiment does not select a per-session user agent. The session API uses separate processes to avoid depending on client interception hooks.
+
+## Per-session user agents
+
+Create a session for each browser or device request profile. Each session runs its own Lightpanda process and embedded proxy. This costs more resources than sharing one browser, but preserves client CDP commands, including request interception, and applies the profile to every proxied request.
+
+The original endpoint on port 9222 keeps its existing behavior. The optional session service uses port 9223.
+
+### Docker
+
+Generate an API key and start the additional service:
+
+```sh
+export SESSION_API_KEY="$(openssl rand -hex 32)"
+docker compose --profile sessions up -d --build
+```
+
+For a server deployment, set `SESSION_PUBLIC_URL` to the WebSocket origin clients can reach, such as `ws://<server-tailscale-ip>:9223`. Keep `CDP_BIND_IP` restricted to loopback or the server's private address. On Coolify, enable the profile with `COMPOSE_PROFILES=sessions` and configure the session variables below.
+
+### Native
+
+Install both executables alongside Lightpanda:
+
+```sh
+cargo install --path proxy --locked --bin camopanda --bin camopanda-gateway
+export SESSION_API_KEY="$(openssl rand -hex 32)"
+camopanda-gateway
+```
+
+The gateway finds `camopanda` beside its own executable, or at `CAMOPANDA_BIN`. Both native commands support macOS and Linux.
+
+### Create and use a session
+
+```sh
+curl --fail http://127.0.0.1:9223/v1/sessions \
+  -H "Authorization: Bearer $SESSION_API_KEY" \
+  -H 'Content-Type: application/json' \
+  --data '{"user_agent":"Your browser or device test user-agent"}'
+```
+
+The JSON response contains `id`, `user_agent`, `cdp_url`, and `idle_timeout_secs`. Pass the returned `cdp_url` to your CDP client:
+
+```sh
+agent-browser --session profile-test --cdp '<returned-cdp-url>' open https://example.com
+agent-browser --session profile-test --cdp '<returned-cdp-url>' snapshot
+```
+
+The CDP URL contains a session-specific access token. Treat the complete URL as a credential. One client can connect to a session at a time. A second connection receives HTTP 409. Create another session for another concurrent client.
+
+Inspect or delete a session with the administrator API key:
+
+```sh
+curl --fail -H "Authorization: Bearer $SESSION_API_KEY" \
+  http://127.0.0.1:9223/v1/sessions/<id>
+curl --fail -X DELETE -H "Authorization: Bearer $SESSION_API_KEY" \
+  http://127.0.0.1:9223/v1/sessions/<id>
+```
+
+Deletion closes the CDP connection and stops the browser and proxy. Idle sessions expire automatically. Activity means CDP messages in either direction; inspection requests do not extend the timeout. Disconnected sessions can reconnect before expiry, but browser page state and cookies are not guaranteed to survive reconnection. All sessions are lost on gateway restart. Its persistent volume stores certificates, not session records.
+
+User-agent values must be nonempty valid HTTP header values, at most 512 bytes. The gateway accepts only a `user_agent` field. It reserves capacity before browser startup; excess sessions receive HTTP 429. Startup failures receive HTTP 503. Internal `X-Camopanda-*` headers and `Sec-Ch-Ua*` headers are stripped before requests leave the proxy.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SESSION_API_KEY` | Required | Bearer key for create, inspect, and delete; at least 32 bytes. |
+| `SESSION_PUBLIC_URL` | `ws://127.0.0.1:9223` | WebSocket origin used in returned client URLs. |
+| `SESSION_MAX_SESSIONS` | `4` | Maximum starting and live sessions, from 1 to 32. |
+| `SESSION_IDLE_SECS` | `300` | Idle timeout, from 1 to 86400 seconds; sweep runs each second. |
+| `SESSION_PORT` | `9223` | Published Docker host port; update the public URL if changed. |
+| `SESSION_BIND` | `127.0.0.1:9223` native | Native listening address; Docker uses `0.0.0.0:9223`. |
+| `SESSION_STATE_DIR` | User application-data directory under `camopanda/sessions` native; `/state` Docker | Certificate storage shared by the session wrappers. |
+| `CAMOPANDA_BIN` | Executable beside the gateway | Native wrapper location. |
+
+The gateway provides an unauthenticated `/health` probe. CDP messages are limited to 16 MiB. Keep the service on a restricted network even with authentication: clients can access destinations reachable from the server. Per-request profile changes inside one session are not supported; create another session to change the user agent.
+
+Run the end-to-end session checks locally with Node.js 22+, Lightpanda, and `curl` installed:
+
+```sh
+cargo build --manifest-path proxy/Cargo.toml --locked --bins
+node scripts/session-smoke.mjs
+TEST_AGENT_BROWSER=1 node scripts/session-smoke.mjs
+```
+
+The smoke test checks concurrent profiles, redirect/script/fetch headers, client interception, authentication, capacity, reconnection, deletion, idle expiry, and process cleanup. The optional check also runs agent-browser.
 
 To inspect outgoing headers with a public echo service:
 
