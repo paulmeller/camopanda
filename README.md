@@ -169,7 +169,7 @@ Camopanda packages separate Lightpanda and Hudsucker components. It is an indepe
 - [Lightpanda](https://github.com/lightpanda-io/browser/blob/main/LICENSING.md) uses AGPL-3.0-only.
 - [Hudsucker](https://github.com/omjadas/hudsucker) is available under MIT or Apache-2.0.
 
-Each dependency retains its own license. A license for Camopanda's own code must be selected before publication.
+Camopanda's original code is licensed under [MIT](LICENSE). Lightpanda remains licensed under AGPL-3.0-only. Other dependencies retain their respective licenses; Camopanda's MIT license does not replace their terms.
 
 ## Validation and known limits
 
