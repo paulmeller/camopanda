@@ -40,3 +40,13 @@ source archive contains the patched tree, including upstream build/dependency
 manifests. The Docker image also includes this archive at
 `/usr/local/share/camopanda/lightpanda-source.tar.gz`; it can be extracted with
 `docker cp`. Camopanda's release includes the patch and pins to reproduce it.
+
+The patch also makes the upstream reentrant element-scroll fixture wait for its
+completion condition with a one-second deadline and a 50ms quiet period. Its
+assertions still require exactly three scroll events and two scrollend events.
+[The macOS baseline comparison](https://github.com/paulmeller/camopanda/actions/runs/37976148256/job/113974833644)
+failed identically before and after the header patch because its fixed 100ms wait
+expired before the event sequence completed. This changes test synchronization,
+not browser scroll behavior. For future diagnosis, `--test-baseline` compares the
+unpatched suite first in a fresh build work directory; the patched suite remains
+mandatory regardless of the baseline result.

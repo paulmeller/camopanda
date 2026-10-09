@@ -46,7 +46,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           test "$(uname -m)" = arm64
-          python3 scripts/build-browser.py --test --test-baseline
+          python3 scripts/build-browser.py --test
           cargo build --manifest-path cli/Cargo.toml --locked --release --bins
           cargo build --manifest-path cli/Cargo.toml --locked --bins
           cp cli/target/release/camopanda cli/target/release/camopanda-gateway dist/

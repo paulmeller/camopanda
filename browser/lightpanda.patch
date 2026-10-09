@@ -129,6 +129,26 @@ index 227a044..27a39f2 100644
 +        try std.testing.expectEqualStrings("Mozilla/5.0", config.http_headers.user_agent);
 +    }
 +}
+diff --git a/src/browser/tests/window_scroll.html b/src/browser/tests/window_scroll.html
+index ccba450..a84f04a 100644
+--- a/src/browser/tests/window_scroll.html
++++ b/src/browser/tests/window_scroll.html
+@@ -107,7 +107,14 @@
+   for (let i = 1; i <= 100; i++) {
+     element.scrollTop = i;
+   }
+-  await new Promise(resolve => setTimeout(resolve, 100));
++  // Wait for the reentrant sequence, with a hard deadline. Shared CI runners
++  // can delay timer callbacks beyond 100ms; event counts remain the contract.
++  const deadline = Date.now() + 1000;
++  while (scrollends < 2 && Date.now() < deadline) {
++    await new Promise(resolve => setTimeout(resolve, 10));
++  }
++  // Also observe a quiet period so duplicate events still fail the assertions.
++  await new Promise(resolve => setTimeout(resolve, 50));
+ 
+   state.resolve();
+   await state.done(() => {
 diff --git a/src/browser/webapi/net/WebSocket.zig b/src/browser/webapi/net/WebSocket.zig
 index ab03b3f..71272ec 100644
 --- a/src/browser/webapi/net/WebSocket.zig
