@@ -43,7 +43,7 @@ patch = ROOT / 'browser/lightpanda.patch'
 expected = patch.read_bytes()
 current = subprocess.check_output(['git', '-C', str(source), 'diff', '--binary'])
 if a.test_baseline and current: raise SystemExit('baseline comparison requires an unpatched source tree')
-elif current != expected: raise SystemExit('browser work directory contains a different patch; use a fresh --work directory')
+if current and current != expected: raise SystemExit('browser work directory contains a different patch; use a fresh --work directory')
 v8file = f'libc_v8_{pins["v8_version"]}_{osname}_{arch}.a'
 v8 = source / '.lp-cache/prebuilt-v8' / pins['v8_tag'] / v8file
 v8.parent.mkdir(parents=True, exist_ok=True)
