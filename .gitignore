@@ -1,4 +1,4 @@
-proxy/target/
+cli/target/
 .env
 .env.*
 !.env.example
@@ -7,3 +7,6 @@ proxy/target/
 .runtime/
 *.log
 .DS_Store
+
+dist/
+__pycache__/

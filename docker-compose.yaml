@@ -1,36 +1,23 @@
 services:
-  proxy:
-    build: ./proxy
+  browser:
+    image: ghcr.io/paulmeller/camopanda:${CAMOPANDA_VERSION:-0.2.0}
+    build:
+      context: .
+      target: browser
+    init: true
     environment:
       UPSTREAM_USER_AGENT: "${UPSTREAM_USER_AGENT:-Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36}"
-    volumes:
-      - proxy-state:/state
-      - proxy-trust:/trust
-    healthcheck:
-      test: [CMD, /usr/local/bin/hudsucker-proxy, --healthcheck]
-      interval: 2s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
-
-  lightpanda:
-    build: ./lightpanda
-    environment:
       LIGHTPANDA_DISABLE_TELEMETRY: "${LIGHTPANDA_DISABLE_TELEMETRY:-true}"
-    depends_on:
-      proxy:
-        condition: service_healthy
-    volumes:
-      - proxy-trust:/trust:ro
     ports:
       - "${CDP_BIND_IP:-127.0.0.1}:${CDP_PORT:-9222}:9222"
     restart: unless-stopped
 
   sessions:
     profiles: [sessions]
+    image: ghcr.io/paulmeller/camopanda-gateway:${CAMOPANDA_VERSION:-0.2.0}
     build:
       context: .
-      dockerfile: sessions/Dockerfile
+      target: gateway
     init: true
     environment:
       SESSION_API_KEY: "${SESSION_API_KEY:-}"
@@ -38,8 +25,6 @@ services:
       SESSION_MAX_SESSIONS: "${SESSION_MAX_SESSIONS:-4}"
       SESSION_IDLE_SECS: "${SESSION_IDLE_SECS:-300}"
       LIGHTPANDA_DISABLE_TELEMETRY: "${LIGHTPANDA_DISABLE_TELEMETRY:-true}"
-    volumes:
-      - session-state:/state
     ports:
       - "${CDP_BIND_IP:-127.0.0.1}:${SESSION_PORT:-9223}:9223"
     healthcheck:
@@ -48,8 +33,3 @@ services:
       timeout: 3s
       retries: 20
     restart: unless-stopped
-
-volumes:
-  proxy-state:
-  proxy-trust:
-  session-state:

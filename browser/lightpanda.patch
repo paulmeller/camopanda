@@ -1,0 +1,253 @@
+diff --git a/src/Config.zig b/src/Config.zig
+index 227a044..27a39f2 100644
+--- a/src/Config.zig
++++ b/src/Config.zig
+@@ -279,6 +279,8 @@ const CommonOptions = .{
+     .{ .name = "web_bot_auth_keyid", .type = ?[]const u8 },
+     .{ .name = "web_bot_auth_domain", .type = ?[]const u8 },
+     .{ .name = "user_agent", .type = ?[]const u8, .validator = userAgentValidator },
++    .{ .name = "camopanda_header_profiles", .type = bool },
++    .{ .name = "camopanda_lock_user_agent", .type = bool },
+     .{ .name = "locale", .type = [:0]const u8, .default = HttpHeaders.default_locale, .validator = localeValidator },
+     .{ .name = "timezone", .type = ?[:0]const u8, .validator = timezoneValidator },
+     .{ .name = "block_private_networks", .type = bool },
+@@ -490,6 +492,7 @@ const Commands = cli.Builder(.{
+     },
+     .{ .name = "version", .options = .{
+         .{ .name = "check", .type = bool },
++        .{ .name = "camopanda_capabilities", .type = bool },
+     } },
+ });
+ 
+@@ -520,6 +523,12 @@ pub fn init(allocator: Allocator, exec_name: []const u8, mode: Mode) !Config {
+         .http_headers = undefined,
+     };
+     if (modeNeedsHttp(mode)) {
++        if (config.userAgent()) |ua| {
++            validateProfileUserAgent(ua, config.headerProfiles()) catch |err| {
++                log.fatal(.app, "invalid user-agent", .{ .err = err, .hint = "Mozilla requires --camopanda-header-profiles" });
++                return error.InvalidArgument;
++            };
++        }
+         config.http_headers = try HttpHeaders.init(allocator, &config);
+     }
+ 
+@@ -750,6 +759,25 @@ fn userAgentSuffix(self: *const Config) ?[]const u8 {
+     };
+ }
+ 
++pub fn headerProfiles(self: *const Config) bool {
++    return switch (self.mode) {
++        inline .serve, .fetch, .mcp, .agent => |opts| opts.camopanda_header_profiles,
++        else => false,
++    };
++}
++
++pub fn lockUserAgent(self: *const Config) bool {
++    return switch (self.mode) {
++        inline .serve, .fetch, .mcp, .agent => |opts| opts.camopanda_header_profiles and opts.camopanda_lock_user_agent,
++        else => false,
++    };
++}
++
++pub fn isProfileReservedHeader(name: []const u8) bool {
++    return std.ascii.startsWithIgnoreCase(name, "Sec-Ch-Ua") or
++        std.ascii.startsWithIgnoreCase(name, "X-Camopanda-");
++}
++
+ pub fn userAgent(self: *const Config) ?[]const u8 {
+     return switch (self.mode) {
+         inline .serve, .fetch, .mcp, .agent => |opts| opts.user_agent,
+@@ -1269,6 +1297,19 @@ pub fn parseArgs(allocator: Allocator, proc_args: std.process.Args) !Config {
+         command = .{ .agent = agent_opts };
+     }
+ 
++    switch (command) {
++        inline .serve, .fetch, .mcp, .agent => |opts| {
++            if (opts.user_agent) |ua| {
++                validateProfileUserAgent(ua, opts.camopanda_header_profiles) catch |err| {
++                    log.fatal(.app, "invalid user-agent", .{ .err = err });
++                    allocator.free(ua);
++                    return error.InvalidArgument;
++                };
++            }
++        },
++        else => {},
++    }
++
+     if (command == .fetch and command.fetch.url.items.len == 0) {
+         log.fatal(.app, "missing URL", .{ .hint = "usage: lightpanda fetch <url>... [OPTIONS]" });
+         return error.MissingArgument;
+@@ -1654,7 +1695,7 @@ fn accumulateValidator(allocator: Allocator, args: *std.process.Args.Iterator, f
+ 
+ fn userAgentValidator(allocator: Allocator, args: *std.process.Args.Iterator, ua: *?[]const u8) !void {
+     const str = args.next() orelse return error.MissingArgument;
+-    validateUserAgent(str) catch |err| {
++    validateProfileUserAgent(str, true) catch |err| {
+         log.fatal(.app, "invalid user-agent", .{ .err = err, .hint = "must be printable ASCII and can't contain Mozilla" });
+         return error.InvalidArgument;
+     };
+@@ -1663,13 +1704,17 @@ fn userAgentValidator(allocator: Allocator, args: *std.process.Args.Iterator, ua
+ }
+ 
+ pub fn validateUserAgent(ua: []const u8) !void {
++    return validateProfileUserAgent(ua, false);
++}
++
++pub fn validateProfileUserAgent(ua: []const u8, enabled: bool) !void {
+     for (ua) |c| {
+         if (!std.ascii.isPrint(c)) {
+             return error.NonPrintable;
+         }
+     }
+ 
+-    if (std.ascii.findIgnoreCase(ua, "mozilla") != null) {
++    if (!enabled and std.ascii.findIgnoreCase(ua, "mozilla") != null) {
+         return error.Reserved;
+     }
+ }
+@@ -1772,3 +1817,22 @@ pub fn tagJsonArray(comptime E: type) []const u8 {
+     }
+     return s ++ "]";
+ }
++
++test "Config: profile validation keeps default restriction and rejects injection" {
++    try std.testing.expectError(error.Reserved, validateProfileUserAgent("Mozilla/5.0", false));
++    try validateProfileUserAgent("Mozilla/5.0", true);
++    try std.testing.expectError(error.NonPrintable, validateProfileUserAgent("Mozilla/5.0\r\nInjected: yes", true));
++}
++
++test "Config: header profile flags work in either argument order" {
++    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
++    defer arena.deinit();
++    for ([_][5][*:0]const u8{
++        .{ "lightpanda", "serve", "--user-agent", "Mozilla/5.0", "--camopanda-header-profiles" },
++        .{ "lightpanda", "serve", "--camopanda-header-profiles", "--user-agent", "Mozilla/5.0" },
++    }) |argv| {
++        const config = try parseArgs(arena.allocator(), .{ .vector = &argv });
++        try std.testing.expect(config.headerProfiles());
++        try std.testing.expectEqualStrings("Mozilla/5.0", config.http_headers.user_agent);
++    }
++}
+diff --git a/src/browser/webapi/net/WebSocket.zig b/src/browser/webapi/net/WebSocket.zig
+index ab03b3f..71272ec 100644
+--- a/src/browser/webapi/net/WebSocket.zig
++++ b/src/browser/webapi/net/WebSocket.zig
+@@ -238,6 +238,7 @@ fn connect(self: *WebSocket, protocols: [][]const u8) !void {
+ 
+     const allocator = arena.allocator();
+     for (http_client.baselineHeaders()) |hdr| {
++        if (http_client.network.config.headerProfiles() and lp.Config.isProfileReservedHeader(hdr.name)) continue;
+         try conn.addHeader(allocator, hdr.name, hdr.value);
+     }
+     if (protocols.len > 0) {
+diff --git a/src/help.zon b/src/help.zon
+index 5fa765d..5ba1f6f 100644
+--- a/src/help.zon
++++ b/src/help.zon
+@@ -547,6 +547,10 @@
+     \\  --timezone <IANA>
+     \\          Time zone used by Date and Intl, e.g. Europe/Paris or UTC.
+     \\          Defaults to the host time zone.
++    \\  --camopanda-header-profiles
++    \\          Enable Camopanda request header testing profiles.
++    \\  --camopanda-lock-user-agent
++    \\          Keep the startup user-agent fixed even with CDP overrides.
+     \\  --user-agent <STRING>
+     \\          Override the User-Agent header entirely. Must not impersonate other
+     \\          browsers; any value containing "Mozilla" is forbidden. The browser
+diff --git a/src/main.zig b/src/main.zig
+index 9b379be..62be735 100644
+--- a/src/main.zig
++++ b/src/main.zig
+@@ -79,7 +79,10 @@ fn run(allocator: Allocator, main_arena: Allocator, proc_args: std.process.Args)
+     switch (args.mode) {
+         .help => |tag| return args.printUsageAndExit(main_arena, tag, true),
+         .version => |opts| {
+-            if (opts.check) {
++            if (opts.camopanda_capabilities) {
++                var stdout = std.Io.File.stdout().writerStreaming(lp.io, &.{});
++                try stdout.interface.print("camopanda-header-profiles-v1\n", .{});
++            } else if (opts.check) {
+                 try lp.checkVersion(allocator, &args);
+             } else {
+                 var stdout = std.Io.File.stdout().writerStreaming(lp.io, &.{});
+diff --git a/src/network/HttpClient.zig b/src/network/HttpClient.zig
+index 2415923..04a133f 100644
+--- a/src/network/HttpClient.zig
++++ b/src/network/HttpClient.zig
+@@ -454,6 +454,7 @@ fn isCrossOriginModeAllowed(transfer: *const Transfer) bool {
+ }
+ 
+ pub fn getUserAgent(self: *const Client) [:0]const u8 {
++    if (self.network.config.lockUserAgent()) return self.network.config.http_headers.user_agent;
+     return self.user_agent_override orelse self.network.config.http_headers.user_agent;
+ }
+ 
+@@ -732,6 +733,7 @@ pub fn newRequest(self: *Client, req: Request, owner: ?*Owner) anyerror!*Transfe
+             .cookie_jar = cookie_jar,
+             .cookie_origin = cookie_origin,
+             .client = self,
++            .camopanda_header_profiles = self.network.config.headerProfiles(),
+             .arena = arena,
+             .id = self.incrReqId(),
+             .start_time = lp.datetime.timestamp(.boot),
+@@ -2399,6 +2401,7 @@ pub const Owner = struct {
+ };
+ 
+ pub const Transfer = struct {
++    camopanda_header_profiles: bool = false,
+     id: u32 = 0,
+     arena: *lp.Arena,
+ 
+@@ -3775,11 +3778,13 @@ pub const Transfer = struct {
+     };
+ 
+     fn addHeader(self: *Transfer, name: []const u8, value: []const u8, opts: HeaderOpts) !void {
++        if (self.camopanda_header_profiles and lp.Config.isProfileReservedHeader(name)) return;
+         const arena = self.arena.allocator();
++        const profile_ua = self.camopanda_header_profiles and std.ascii.eqlIgnoreCase(name, "User-Agent");
+         try self.req_headers.append(arena, .{
+             .name = try arena.dupe(u8, name),
+-            .value = try arena.dupe(u8, value),
+-            .source = opts.source,
++            .value = try arena.dupe(u8, if (profile_ua) self.client.getUserAgent() else value),
++            .source = if (profile_ua) .fixed else opts.source,
+         });
+     }
+ 
+@@ -3824,7 +3829,7 @@ pub const Transfer = struct {
+     }
+ 
+     fn putHeader(self: *Transfer, name: []const u8, value: []const u8, source: HeaderSource, mode: enum { set, append }) !void {
+-        if (verifyHeader(name, value) == false) {
++        if (self.verifyHeader(name, value) == false) {
+             return;
+         }
+ 
+@@ -3864,9 +3869,10 @@ pub const Transfer = struct {
+ 
+     // Central gate for every header entering req_headers; name-keyed
+     // restrictions live here so entry points don't need their own checks.
+-    fn verifyHeader(name: []const u8, value: []const u8) bool {
++    fn verifyHeader(self: *const Transfer, name: []const u8, value: []const u8) bool {
++        if (self.camopanda_header_profiles and lp.Config.isProfileReservedHeader(name)) return false;
+         if (std.ascii.eqlIgnoreCase(name, "user-agent")) {
+-            lp.Config.validateUserAgent(value) catch |err| {
++            lp.Config.validateProfileUserAgent(value, self.camopanda_header_profiles) catch |err| {
+                 log.debug(.http, "invalid header dropped", .{ .name = name, .err = err });
+                 return false;
+             };
+diff --git a/src/server/cdp/domains/emulation.zig b/src/server/cdp/domains/emulation.zig
+index 65fda60..4e82ecc 100644
+--- a/src/server/cdp/domains/emulation.zig
++++ b/src/server/cdp/domains/emulation.zig
+@@ -151,7 +151,7 @@ pub fn setUserAgentOverride(cmd: *CDP.Command) !void {
+     }
+ 
+     const ua = params.userAgent;
+-    const reserved = if (Config.validateUserAgent(ua)) false else |err| switch (err) {
++    const reserved = if (Config.validateProfileUserAgent(ua, cmd.cdp.browser.http_client.network.config.headerProfiles())) false else |err| switch (err) {
+         error.NonPrintable => return cmd.sendError(-32602, "User agent contains non-printable characters", .{}),
+         error.Reserved => true,
+     };

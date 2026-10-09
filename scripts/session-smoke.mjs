@@ -20,7 +20,7 @@ await new Promise(r=>fixture.listen(0,'127.0.0.1',r));
 const origin=`http://127.0.0.1:${fixture.address().port}`;
 const reserved=http.createServer();await new Promise(r=>reserved.listen(0,'127.0.0.1',r));const port=reserved.address().port;await new Promise(r=>reserved.close(r));
 const api=`http://127.0.0.1:${port}`;
-const child=spawn('proxy/target/debug/camopanda-gateway',[],{env:{...process.env,SESSION_API_KEY:key,SESSION_BIND:`127.0.0.1:${port}`,SESSION_PUBLIC_URL:`ws://127.0.0.1:${port}`,SESSION_MAX_SESSIONS:'2',SESSION_IDLE_SECS:'8'},stdio:['ignore','ignore','pipe']});
+const child=spawn('cli/target/debug/camopanda-gateway',[],{env:{...process.env,SESSION_API_KEY:key,SESSION_BIND:`127.0.0.1:${port}`,SESSION_PUBLIC_URL:`ws://127.0.0.1:${port}`,SESSION_MAX_SESSIONS:'2',SESSION_IDLE_SECS:'8'},stdio:['ignore','ignore','pipe']});
 let logs='';let spawnError;child.stderr.on('data',d=>logs+=d);child.on('error',e=>{spawnError=e;});
 const sockets=new Set();const ids=[];
 const request=(path,method='GET',body,auth=true)=>fetch(api+path,{method,headers:{...(auth?{Authorization:`Bearer ${key}`} :{}),...(body!==undefined?{'Content-Type':'application/json'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
@@ -43,6 +43,7 @@ try{
  const sessions=await Promise.all(attempts.filter(r=>r.status===201).map(r=>r.json()));ids.push(...sessions.map(s=>s.id));
  for(const session of sessions){const bad=new URL(session.cdp_url);bad.search='?token=wrong';assert.equal((await fetch(bad.href.replace('ws:','http:'))).status,404);}
  const clients=await Promise.all(sessions.map(s=>client(s.cdp_url)));
+ await clients[0].call('Emulation.setUserAgentOverride',{userAgent:'Mozilla/5.0 ForgedCDP/1'},clients[0].sessionId);
  await Promise.all(clients.map((c,i)=>c.navigate(String(i),i===0)));
  for(let i=0;i<sessions.length;i++)for(const path of ['/redirect','/page','/script','/fetch']){const matches=records.filter(r=>r.path===path&&r.profile===String(i));assert(matches.length);for(const record of matches){assert.equal(record.headers['user-agent'],sessions[i].user_agent);assert(!Object.keys(record.headers).some(k=>k.startsWith('sec-ch-ua')||k.startsWith('x-camopanda-')));}}
  if(process.env.TEST_HTTPS==='1') {

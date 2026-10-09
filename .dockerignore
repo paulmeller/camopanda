@@ -1,8 +1,10 @@
 .git
 .runtime
 .env*
-proxy/target
+cli/target
+dist
 assets
+spikes
 *.key
 *.pem
 *.log

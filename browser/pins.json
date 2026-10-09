@@ -1,0 +1,17 @@
+{
+  "repository": "https://github.com/lightpanda-io/browser.git",
+  "revision": "d123cf711b8c0d80f9d0bb7a4117130a195d3105",
+  "zig": "0.17.0",
+  "zig_sha256": {
+    "aarch64-macos": "b607e9b9234790a008116ae5bdb71c6243b84b9fb42a53a9e70fde41c06c536a",
+    "x86_64-linux": "1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026",
+    "aarch64-linux": "9e8d11661d4ae3bd57702a3832781e23ad151dde5798e16a5ccd503f65234ff8"
+  },
+  "v8_tag": "v0.5.9",
+  "v8_version": "15.5.35.13",
+  "v8_sha256": {
+    "aarch64-macos": "dc14027e53df891399522f6089296acfdf37207afaca1e49dd05c446d3fc475f",
+    "x86_64-linux": "eed0fa1a97d815e2f5000e7a29153d62e06ef92d2d80a024598701394e9322cb",
+    "aarch64-linux": "30edeb56ec8374364ccbb50965fc6671f3c95addf980b367d6bd4ef9d96cde34"
+  }
+}

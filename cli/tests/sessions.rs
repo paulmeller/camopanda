@@ -1,8 +1,6 @@
-use hudsucker::{
-    Body,
-    hyper::{Request, StatusCode},
-};
-use lightpanda_hudsucker_proxy::sessions::{Config, Gateway};
+use camopanda::Body;
+use camopanda::sessions::{Config, Gateway};
+use hyper::{Request, StatusCode};
 
 fn config() -> Config {
     Config {
@@ -11,8 +9,7 @@ fn config() -> Config {
         api_key: "test-key-with-at-least-thirty-two-bytes".into(),
         max_sessions: 2,
         idle_secs: 300,
-        camopanda: "missing-camopanda-fixture".into(),
-        state_dir: std::env::temp_dir().join("camopanda-session-fixture"),
+        browser: "missing-browser-fixture".into(),
     }
 }
 fn gateway() -> Gateway {
@@ -24,7 +21,7 @@ async fn api_requires_auth_before_parsing_body() {
     let response = gateway()
         .handle(
             Request::post("/v1/sessions")
-                .body(Body::from("not json".to_string()))
+                .body(Body::new("not json".into()))
                 .unwrap(),
         )
         .await;
@@ -42,8 +39,8 @@ async fn rejects_invalid_user_agent_without_starting_process() {
                         "Bearer test-key-with-at-least-thirty-two-bytes",
                     )
                     .header("Content-Type", "application/json")
-                    .body(Body::from(
-                        serde_json::json!({"user_agent": ua}).to_string(),
+                    .body(Body::new(
+                        serde_json::json!({"user_agent": ua}).to_string().into(),
                     ))
                     .unwrap(),
             )
@@ -69,7 +66,7 @@ async fn rejects_oversized_body_and_unknown_fields() {
                         "Bearer test-key-with-at-least-thirty-two-bytes",
                     )
                     .header("Content-Type", "application/json")
-                    .body(Body::from(body))
+                    .body(Body::new(body.into()))
                     .unwrap(),
             )
             .await;
@@ -82,7 +79,7 @@ async fn missing_session_capability_fails_closed() {
     let response = gateway()
         .handle(
             Request::get("/v1/sessions/unknown/cdp")
-                .body(Body::empty())
+                .body(Body::new(bytes::Bytes::new()))
                 .unwrap(),
         )
         .await;
@@ -101,7 +98,7 @@ async fn startup_failure_does_not_consume_capacity() {
                         "Bearer test-key-with-at-least-thirty-two-bytes",
                     )
                     .header("Content-Type", "application/json")
-                    .body(Body::from(r#"{"user_agent":"Test/1"}"#.to_string()))
+                    .body(Body::new(r#"{"user_agent":"Test/1"}"#.into()))
                     .unwrap(),
             )
             .await;

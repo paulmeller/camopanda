@@ -1,10 +1,10 @@
-use lightpanda_hudsucker_proxy::sessions::{Config, Gateway};
+use camopanda::sessions::{Config, Gateway};
 #[tokio::main]
 async fn main() {
     let argument = std::env::args().nth(1);
     if argument.as_deref() == Some("--help") {
         println!(
-            "Usage: camopanda-gateway\nRequired: SESSION_API_KEY (at least 32 bytes).\nOptional: SESSION_BIND, SESSION_PUBLIC_URL, SESSION_MAX_SESSIONS, SESSION_IDLE_SECS, SESSION_STATE_DIR, CAMOPANDA_BIN.\nEach session starts an isolated Lightpanda process and proxy."
+            "Usage: camopanda-gateway\nRequired: SESSION_API_KEY (at least 32 bytes).\nOptional: SESSION_BIND, SESSION_PUBLIC_URL, SESSION_MAX_SESSIONS, SESSION_IDLE_SECS, LIGHTPANDA_BIN.\nEach session starts an isolated Lightpanda process."
         );
         return;
     }

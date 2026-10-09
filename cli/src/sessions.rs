@@ -1,12 +1,9 @@
-//! Authenticated session API with process-isolated browser and proxy profiles.
+//! Authenticated session API with process-isolated browser profiles.
+use crate::{Body, browser, validate_user_agent};
+use futures_util::{SinkExt, StreamExt};
 use http_body_util::{BodyExt, Limited};
-use hudsucker::{
-    Body,
-    futures::{SinkExt, StreamExt},
-    hyper::{Method, Request, Response, StatusCode, header::HeaderValue},
-    hyper_util::rt::TokioIo,
-    tokio_tungstenite::{connect_async_with_config, tungstenite::protocol::WebSocketConfig},
-};
+use hyper::{Method, Request, Response, StatusCode, header::HeaderValue};
+use hyper_util::rt::TokioIo;
 use serde::Deserialize;
 use serde_json::json;
 use std::{
@@ -23,10 +20,11 @@ use std::{
 };
 use tokio::{
     net::{TcpListener, TcpStream},
-    process::{Child, Command},
+    process::Child,
     sync::{Mutex as AsyncMutex, watch},
     time::{sleep, timeout},
 };
+use tokio_tungstenite::{connect_async_with_config, tungstenite::protocol::WebSocketConfig};
 use uuid::Uuid;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -37,8 +35,7 @@ pub struct Config {
     pub api_key: String,
     pub max_sessions: usize,
     pub idle_secs: u64,
-    pub camopanda: PathBuf,
-    pub state_dir: PathBuf,
+    pub browser: PathBuf,
 }
 impl Config {
     pub fn from_env() -> Result<Self, Error> {
@@ -55,28 +52,7 @@ impl Config {
             api_key: env::var("SESSION_API_KEY").unwrap_or_default(),
             max_sessions: number("SESSION_MAX_SESSIONS", "4")?,
             idle_secs: number("SESSION_IDLE_SECS", "300")?,
-            camopanda: env::var_os("CAMOPANDA_BIN")
-                .map(PathBuf::from)
-                .unwrap_or(env::current_exe()?.with_file_name("camopanda")),
-            state_dir: match env::var_os("SESSION_STATE_DIR") {
-                Some(path) => PathBuf::from(path),
-                None => {
-                    let base = match env::var_os("XDG_DATA_HOME") {
-                        Some(path) => PathBuf::from(path).join("camopanda"),
-                        None => {
-                            let home = PathBuf::from(
-                                env::var_os("HOME").ok_or("HOME or SESSION_STATE_DIR required")?,
-                            );
-                            if cfg!(target_os = "macos") {
-                                home.join("Library/Application Support/camopanda")
-                            } else {
-                                home.join(".local/share/camopanda")
-                            }
-                        }
-                    };
-                    base.join("sessions")
-                }
-            },
+            browser: browser::executable()?,
         })
     }
 }
@@ -138,7 +114,7 @@ fn response(status: StatusCode, value: serde_json::Value) -> Response<Body> {
         .status(status)
         .header("Content-Type", "application/json")
         .header("Cache-Control", "no-store")
-        .body(Body::from(value.to_string()))
+        .body(Body::new(value.to_string().into()))
         .unwrap()
 }
 fn error(status: StatusCode, message: &str) -> Response<Body> {
@@ -160,7 +136,7 @@ impl Gateway {
         if !(1..=32).contains(&config.max_sessions) || !(1..=86400).contains(&config.idle_secs) {
             return Err("session limit must be 1..32 and idle seconds 1..86400".into());
         }
-        let uri: hudsucker::hyper::Uri = config.public_url.parse()?;
+        let uri: hyper::Uri = config.public_url.parse()?;
         if !matches!(uri.scheme_str(), Some("ws" | "wss"))
             || uri.authority().is_none()
             || uri.authority().unwrap().as_str().contains('@')
@@ -175,7 +151,7 @@ impl Gateway {
             stopping: Arc::new(AtomicBool::new(false)),
         })
     }
-    fn authorized(&self, request: &Request<Body>) -> bool {
+    fn authorized<B>(&self, request: &Request<B>) -> bool {
         request
             .headers()
             .get("authorization")
@@ -193,6 +169,9 @@ impl Gateway {
         }
     }
     async fn create(&self, user_agent: String) -> Result<Arc<Session>, StatusCode> {
+        browser::verify(&self.config.browser)
+            .await
+            .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
         let reservation = TcpListener::bind("127.0.0.1:0")
             .await
             .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
@@ -209,19 +188,24 @@ impl Gateway {
                 return Err(StatusCode::TOO_MANY_REQUESTS);
             }
             drop(reservation);
-            let child = Command::new(&self.config.camopanda)
-                .arg("--state-dir")
-                .arg(&self.config.state_dir)
-                .arg("--user-agent")
-                .arg(&user_agent)
-                .args(["serve", "--host", "127.0.0.1", "--port", &port.to_string()])
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .process_group(0)
-                .kill_on_drop(true)
-                .spawn()
-                .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+            let child = browser::command(
+                &self.config.browser,
+                &user_agent,
+                &[
+                    "serve".into(),
+                    "--host".into(),
+                    "127.0.0.1".into(),
+                    "--port".into(),
+                    port.to_string(),
+                ],
+            )
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0)
+            .kill_on_drop(true)
+            .spawn()
+            .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
             let (stop, _) = watch::channel(false);
             let session = Arc::new(Session {
                 id: Uuid::new_v4().simple().to_string(),
@@ -266,7 +250,11 @@ impl Gateway {
         session.touch();
         Ok(session)
     }
-    pub async fn handle(&self, mut request: Request<Body>) -> Response<Body> {
+    pub async fn handle<B>(&self, mut request: Request<B>) -> Response<Body>
+    where
+        B: hyper::body::Body<Data = bytes::Bytes> + Send,
+        B::Error: Into<browser::Error>,
+    {
         let path = request.uri().path().to_string();
         if path == "/health" && request.method() == Method::GET {
             return response(StatusCode::OK, json!({"status":"ok"}));
@@ -302,14 +290,8 @@ impl Gateway {
                 Ok(v) => v,
                 Err(_) => return error(StatusCode::BAD_REQUEST, "invalid session request"),
             };
-            if input.user_agent.trim().is_empty()
-                || input.user_agent.len() > 512
-                || HeaderValue::from_str(&input.user_agent).is_err()
-            {
-                return error(
-                    StatusCode::BAD_REQUEST,
-                    "user_agent must be a nonempty valid header value of at most 512 bytes",
-                );
+            if let Err(message) = validate_user_agent(&input.user_agent) {
+                return error(StatusCode::BAD_REQUEST, message);
             }
             return match self.create(input.user_agent).await {
                 Ok(session) => response(
@@ -350,7 +332,7 @@ impl Gateway {
                 return Response::builder()
                     .status(StatusCode::NO_CONTENT)
                     .header("Cache-Control", "no-store")
-                    .body(Body::empty())
+                    .body(Body::new(bytes::Bytes::new()))
                     .unwrap();
             }
             if request.method() == Method::GET {
@@ -438,7 +420,7 @@ impl Gateway {
                 }
             }
         });
-        response.map(Body::from)
+        response
     }
     async fn sweep(&self) {
         let sessions: Vec<_> = self.sessions.lock().unwrap().values().cloned().collect();
@@ -485,12 +467,12 @@ impl Gateway {
                     let gateway = self.clone();
                     tokio::spawn(async move {
                         let _permit = permit;
-                        let service = hudsucker::hyper::service::service_fn(move |request| {
+                        let service = hyper::service::service_fn(move |request| {
                             let gateway = gateway.clone();
-                            async move { Ok::<_,Infallible>(gateway.handle(request.map(Body::from)).await) }
+                            async move { Ok::<_,Infallible>(gateway.handle(request).await) }
                         });
-                        let _ = hudsucker::hyper::server::conn::http1::Builder::new()
-                            .timer(hudsucker::hyper_util::rt::TokioTimer::new())
+                        let _ = hyper::server::conn::http1::Builder::new()
+                            .timer(hyper_util::rt::TokioTimer::new())
                             .header_read_timeout(Duration::from_secs(10))
                             .serve_connection(TokioIo::new(stream), service).with_upgrades().await;
                     });
@@ -506,7 +488,7 @@ impl Gateway {
             .drain()
             .map(|(_, s)| s)
             .collect();
-        hudsucker::futures::future::join_all(sessions.iter().map(|session| session.close())).await;
+        futures_util::future::join_all(sessions.iter().map(|session| session.close())).await;
         Ok(())
     }
 }
