@@ -106,7 +106,7 @@ export SESSION_API_KEY="$(openssl rand -hex 32)"
 docker compose --profile sessions up -d --build
 ```
 
-For a server deployment, set `SESSION_PUBLIC_URL` to the WebSocket origin clients can reach, such as `ws://<server-tailscale-ip>:9223`. Keep `CDP_BIND_IP` restricted to loopback or the server's private address. On Coolify, set `COMPOSE_PROFILES=sessions` and make that variable available at **both build time and runtime**. This ensures Coolify builds the optional image before starting it. Keep `SESSION_API_KEY` runtime-only, and configure the session variables below.
+For a server deployment, set `SESSION_PUBLIC_URL` to the WebSocket origin clients can reach, such as `ws://<server-tailscale-ip>:9223`. Keep `CDP_BIND_IP` restricted to loopback or the server's private address. Configure the session variables below.
 
 ### Native
 
@@ -232,9 +232,9 @@ The HTTP discovery endpoint does not fetch websites. Camopanda does not provide 
 
 For remote access, use the server address in the WebSocket URL. Discovery can advertise a loopback address; remote clients should use the explicit server URL.
 
-## Deploy with Coolify
+## Remote access
 
-Create a Git-backed Docker Compose application and select `/docker-compose.yaml`. Both images build from this repository. Preserve the named volumes between deployments.
+Run the Docker Compose stack on your server. Preserve the named volumes between deployments.
 
 For direct access through Tailscale, set `CDP_BIND_IP` to the server's Tailscale IPv4 address. Connect your computer to the same tailnet, then run:
 
@@ -266,7 +266,7 @@ Camopanda's original code is licensed under [MIT](LICENSE). Lightpanda remains l
 
 ## Validation and known limits
 
-Live checks passed for navigation, snapshots, HTTPS header rewriting, and direct Tailscale access on a Coolify deployment. External-site compatibility depends on the site and has not been tested comprehensively.
+Live checks passed for navigation, snapshots, HTTPS header rewriting, and direct Tailscale access on a remote Docker deployment. External-site compatibility depends on the site and has not been tested comprehensively.
 
 - Login and cookie persistence across browser restarts remain unverified. The persistent volumes store proxy certificates, not a browser profile.
 - Automatic handoff to a human for login is not implemented.
