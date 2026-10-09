@@ -7,6 +7,7 @@ p = argparse.ArgumentParser()
 p.add_argument('--work', type=Path, default=ROOT / '.runtime/browser-build')
 p.add_argument('--output', type=Path, default=ROOT / 'dist')
 p.add_argument('--test', action='store_true')
+p.add_argument('--test-baseline', action='store_true', help='Compare the unpatched upstream suite before applying our patch (fresh work directory required)')
 a = p.parse_args(); a.work = a.work.resolve(); a.output = a.output.resolve()
 pins = json.loads((ROOT / 'browser/pins.json').read_text())
 arch = {'arm64': 'aarch64', 'aarch64': 'aarch64', 'x86_64': 'x86_64'}.get(platform.machine())
@@ -41,7 +42,7 @@ patch = ROOT / 'browser/lightpanda.patch'
 # Reuse only an exact patched source tree; refuse unknown local edits.
 expected = patch.read_bytes()
 current = subprocess.check_output(['git', '-C', str(source), 'diff', '--binary'])
-if not current: run('git', 'apply', '--check', str(patch), cwd=source); run('git', 'apply', str(patch), cwd=source)
+if a.test_baseline and current: raise SystemExit('baseline comparison requires an unpatched source tree')
 elif current != expected: raise SystemExit('browser work directory contains a different patch; use a fresh --work directory')
 v8file = f'libc_v8_{pins["v8_version"]}_{osname}_{arch}.a'
 v8 = source / '.lp-cache/prebuilt-v8' / pins['v8_tag'] / v8file
@@ -49,6 +50,13 @@ v8.parent.mkdir(parents=True, exist_ok=True)
 download(f'https://github.com/lightpanda-io/zig-v8-fork/releases/download/{pins["v8_tag"]}/{v8file}', v8, pins['v8_sha256'][key])
 env = dict(os.environ); env.pop('CAMOPANDA_TEST_HEADERS', None); env['TEST_JOBS'] = '1'
 target = [f'-Dtarget={arch}-linux-gnu.2.38'] if osname == 'linux' else []
+if a.test_baseline:
+    print('=== Unpatched upstream comparison (diagnostic; patched suite remains mandatory) ===', flush=True)
+    baseline = subprocess.run(['make', 'test', f'ZIG={zig}', 'ZIGFLAGS=-j2 -Ddev_fast=false ' + ' '.join(target)], cwd=source, env=env)
+    print(f'Unpatched upstream test exit code: {baseline.returncode}', flush=True)
+if not current:
+    run('git', 'apply', '--check', str(patch), cwd=source)
+    run('git', 'apply', str(patch), cwd=source)
 if a.test: run('make', 'test', f'ZIG={zig}', 'ZIGFLAGS=-j2 -Ddev_fast=false ' + ' '.join(target), cwd=source, env=env)
 run(zig, 'build', '-Doptimize=fast', '-j2', *target, cwd=source, env=env)
 shutil.copy2(source / 'zig-out/bin/lightpanda', a.output / 'lightpanda')
