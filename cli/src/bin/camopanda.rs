@@ -30,6 +30,18 @@ async fn run() -> Result<i32, browser::Error> {
         );
         return Ok(0);
     }
+    if forwarded == ["--healthcheck"] {
+        let address = env::var("CAMOPANDA_HEALTH_ADDR")
+            .unwrap_or_else(|_| "127.0.0.1:9222".into())
+            .parse()?;
+        return Ok(
+            if std::net::TcpStream::connect_timeout(&address, Duration::from_secs(2)).is_ok() {
+                0
+            } else {
+                1
+            },
+        );
+    }
     if forwarded == ["--version"] || forwarded == ["version"] {
         println!(
             "camopanda {} (direct Lightpanda header profiles v1)",

@@ -265,7 +265,7 @@ Live checks passed for navigation, snapshots, HTTPS header profiles, and direct 
 - Login and cookie persistence across browser restarts remain unverified. No persistent browser profile is configured.
 - Automatic handoff to a human for login is not implemented.
 - The browser source revision, Zig version and V8 archives are pinned. Upgrades require cross-platform builds and integration checks.
-- The gateway healthcheck checks its listener. It does not check external DNS or end-to-end navigation.
+- Container healthchecks check their listeners. It does not check external DNS or end-to-end navigation.
 
 Run the CLI and gateway checks locally:
 

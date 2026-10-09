@@ -124,3 +124,19 @@ fn sigterm_and_sigint_reap_browser_and_preserve_signal_exit_codes() {
         fs::remove_dir_all(dir).unwrap();
     }
 }
+
+#[test]
+fn healthcheck_detects_listener_without_launching_browser() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_camopanda"))
+            .env("CAMOPANDA_HEALTH_ADDR", &address)
+            .args(["--lightpanda", "missing-browser", "--healthcheck"])
+            .status()
+            .unwrap()
+    };
+    assert!(run().success());
+    drop(listener);
+    assert_eq!(run().code(), Some(1));
+}

@@ -10,6 +10,11 @@ services:
       LIGHTPANDA_DISABLE_TELEMETRY: "${LIGHTPANDA_DISABLE_TELEMETRY:-true}"
     ports:
       - "${CDP_BIND_IP:-127.0.0.1}:${CDP_PORT:-9222}:9222"
+    healthcheck:
+      test: [CMD, /usr/local/bin/camopanda, --healthcheck]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     restart: unless-stopped
 
   sessions:

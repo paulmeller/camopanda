@@ -21,6 +21,7 @@ COPY --from=browser-build /out/browser-pins.json /usr/local/share/camopanda/brow
 COPY --from=cli-build /src/target/release/camopanda /usr/local/bin/camopanda
 COPY --from=cli-build /src/target/release/camopanda-gateway /usr/local/bin/camopanda-gateway
 COPY LICENSE /usr/local/share/licenses/camopanda/LICENSE
+LABEL org.opencontainers.image.licenses="MIT AND AGPL-3.0-only"
 LABEL org.opencontainers.image.source="https://github.com/paulmeller/camopanda"
 ENV LIGHTPANDA_DISABLE_TELEMETRY=true
 USER camopanda
