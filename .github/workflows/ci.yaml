@@ -18,6 +18,7 @@ jobs:
       - run: cargo fmt --manifest-path cli/Cargo.toml --check
       - run: python3 -m py_compile scripts/build-browser.py
       - run: docker compose --profile sessions config --quiet
+      - run: docker compose -f docker-compose.yaml -f docker-compose.build.yaml --profile sessions config --quiet
   build:
     strategy:
       fail-fast: false

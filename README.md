@@ -63,7 +63,7 @@ agent-browser --session camopanda --cdp ws://127.0.0.1:9222/ open https://exampl
 agent-browser --session camopanda --cdp ws://127.0.0.1:9222/ snapshot
 ```
 
-The versioned image contains the same patched browser as the CLI bundle. To build locally instead, run `docker compose up -d --build`. The default stack is one browser container, with no proxy or certificate volumes. `CAMOPANDA_VERSION` selects the image version; the default is `0.2.0`.
+The versioned image contains the same patched browser as the CLI bundle. To build locally instead, run `docker compose -f docker-compose.yaml -f docker-compose.build.yaml up -d --build`. The default stack is one browser container, with no proxy or certificate volumes. `CAMOPANDA_VERSION` selects the image version; the default is `0.2.0`.
 
 The default profile sends a Mac Chrome 134 user-agent string. CDP binds to host loopback. Stop with `docker compose down`.
 
