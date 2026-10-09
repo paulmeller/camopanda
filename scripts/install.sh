@@ -21,7 +21,7 @@ if command -v sha256sum >/dev/null 2>&1; then actual=$(sha256sum "$work/$file" |
 test "$actual" = "$expected" || { echo 'Release checksum mismatch' >&2; exit 1; }
 tar -xzf "$work/$file" -C "$work"
 mkdir -p "$install_dir" "$install_dir/../share/camopanda"
-for bin in camopanda camopanda-gateway lightpanda; do install -m 755 "$work/$bin" "$install_dir/$bin"; done
+for bin in camopanda lightpanda; do install -m 755 "$work/$bin" "$install_dir/$bin"; done
 cp -R "$work/licenses" "$work/browser-pins.json" "$install_dir/../share/camopanda/"
-"$install_dir/camopanda" --version
+"$install_dir/camopanda" version
 printf 'Installed to %s. Add this directory to PATH.\n' "$install_dir"

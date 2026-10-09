@@ -1,7 +1,6 @@
 .git
 .runtime
 .env*
-cli/target
 dist
 assets
 spikes

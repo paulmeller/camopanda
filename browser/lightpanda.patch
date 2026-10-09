@@ -1,5 +1,5 @@
 diff --git a/src/Config.zig b/src/Config.zig
-index 227a044..27a39f2 100644
+index 227a044..0aff93e 100644
 --- a/src/Config.zig
 +++ b/src/Config.zig
 @@ -279,6 +279,8 @@ const CommonOptions = .{
@@ -32,22 +32,30 @@ index 227a044..27a39f2 100644
          config.http_headers = try HttpHeaders.init(allocator, &config);
      }
  
-@@ -750,6 +759,25 @@ fn userAgentSuffix(self: *const Config) ?[]const u8 {
+@@ -750,11 +759,43 @@ fn userAgentSuffix(self: *const Config) ?[]const u8 {
      };
  }
  
 +pub fn headerProfiles(self: *const Config) bool {
-+    return switch (self.mode) {
++    const cli_flag = switch (self.mode) {
 +        inline .serve, .fetch, .mcp, .agent => |opts| opts.camopanda_header_profiles,
 +        else => false,
 +    };
++    if (cli_flag) return true;
++    if (std.c.getenv("UPSTREAM_USER_AGENT") != null) return true;
++    if (std.c.getenv("CAMOPANDA_HEADER_PROFILES") != null) return true;
++    return false;
 +}
 +
 +pub fn lockUserAgent(self: *const Config) bool {
-+    return switch (self.mode) {
++    const cli_flag = switch (self.mode) {
 +        inline .serve, .fetch, .mcp, .agent => |opts| opts.camopanda_header_profiles and opts.camopanda_lock_user_agent,
 +        else => false,
 +    };
++    if (cli_flag) return true;
++    if (std.c.getenv("CAMOPANDA_LOCK_USER_AGENT") != null) return true;
++    if (std.c.getenv("UPSTREAM_USER_AGENT") != null) return true;
++    return false;
 +}
 +
 +pub fn isProfileReservedHeader(name: []const u8) bool {
@@ -56,9 +64,20 @@ index 227a044..27a39f2 100644
 +}
 +
  pub fn userAgent(self: *const Config) ?[]const u8 {
-     return switch (self.mode) {
+-    return switch (self.mode) {
++    const cli_ua = switch (self.mode) {
          inline .serve, .fetch, .mcp, .agent => |opts| opts.user_agent,
-@@ -1269,6 +1297,19 @@ pub fn parseArgs(allocator: Allocator, proc_args: std.process.Args) !Config {
+         else => null,
+     };
++    if (cli_ua) |u| return u;
++    if (std.c.getenv("UPSTREAM_USER_AGENT")) |ptr| {
++        return std.mem.span(ptr);
++    }
++    return null;
+ }
+ 
+ pub fn locale(self: *const Config) [:0]const u8 {
+@@ -1269,6 +1310,19 @@ pub fn parseArgs(allocator: Allocator, proc_args: std.process.Args) !Config {
          command = .{ .agent = agent_opts };
      }
  
@@ -78,7 +97,7 @@ index 227a044..27a39f2 100644
      if (command == .fetch and command.fetch.url.items.len == 0) {
          log.fatal(.app, "missing URL", .{ .hint = "usage: lightpanda fetch <url>... [OPTIONS]" });
          return error.MissingArgument;
-@@ -1654,7 +1695,7 @@ fn accumulateValidator(allocator: Allocator, args: *std.process.Args.Iterator, f
+@@ -1654,7 +1708,7 @@ fn accumulateValidator(allocator: Allocator, args: *std.process.Args.Iterator, f
  
  fn userAgentValidator(allocator: Allocator, args: *std.process.Args.Iterator, ua: *?[]const u8) !void {
      const str = args.next() orelse return error.MissingArgument;
@@ -87,7 +106,7 @@ index 227a044..27a39f2 100644
          log.fatal(.app, "invalid user-agent", .{ .err = err, .hint = "must be printable ASCII and can't contain Mozilla" });
          return error.InvalidArgument;
      };
-@@ -1663,13 +1704,17 @@ fn userAgentValidator(allocator: Allocator, args: *std.process.Args.Iterator, ua
+@@ -1663,13 +1717,17 @@ fn userAgentValidator(allocator: Allocator, args: *std.process.Args.Iterator, ua
  }
  
  pub fn validateUserAgent(ua: []const u8) !void {
@@ -106,7 +125,7 @@ index 227a044..27a39f2 100644
          return error.Reserved;
      }
  }
-@@ -1772,3 +1817,22 @@ pub fn tagJsonArray(comptime E: type) []const u8 {
+@@ -1772,3 +1830,22 @@ pub fn tagJsonArray(comptime E: type) []const u8 {
      }
      return s ++ "]";
  }

@@ -60,6 +60,7 @@ if not current:
 if a.test: run('make', 'test', f'ZIG={zig}', 'ZIGFLAGS=-j2 -Ddev_fast=false ' + ' '.join(target), cwd=source, env=env)
 run(zig, 'build', '-Doptimize=fast', '-j2', *target, cwd=source, env=env)
 shutil.copy2(source / 'zig-out/bin/lightpanda', a.output / 'lightpanda')
+shutil.copy2(source / 'zig-out/bin/lightpanda', a.output / 'camopanda')
 licenses = a.output / 'licenses/lightpanda'; licenses.mkdir(parents=True, exist_ok=True)
 for name in ['LICENSE', 'LICENSING.md']: shutil.copy2(source / name, licenses / name)
 shutil.copy2(ROOT / 'browser/pins.json', a.output / 'browser-pins.json')

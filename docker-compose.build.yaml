@@ -2,8 +2,3 @@ services:
   browser:
     build:
       context: .
-      target: browser
-  sessions:
-    build:
-      context: .
-      target: gateway

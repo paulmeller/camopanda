@@ -8,26 +8,7 @@ services:
     ports:
       - "${CDP_BIND_IP:-127.0.0.1}:${CDP_PORT:-9222}:9222"
     healthcheck:
-      test: [CMD, /usr/local/bin/camopanda, --healthcheck]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
-
-  sessions:
-    profiles: [sessions]
-    image: ghcr.io/paulmeller/camopanda-gateway:${CAMOPANDA_VERSION:-0.2.0}
-    init: true
-    environment:
-      SESSION_API_KEY: "${SESSION_API_KEY:-}"
-      SESSION_PUBLIC_URL: "${SESSION_PUBLIC_URL:-ws://127.0.0.1:9223}"
-      SESSION_MAX_SESSIONS: "${SESSION_MAX_SESSIONS:-4}"
-      SESSION_IDLE_SECS: "${SESSION_IDLE_SECS:-300}"
-      LIGHTPANDA_DISABLE_TELEMETRY: "${LIGHTPANDA_DISABLE_TELEMETRY:-true}"
-    ports:
-      - "${CDP_BIND_IP:-127.0.0.1}:${SESSION_PORT:-9223}:9223"
-    healthcheck:
-      test: [CMD, /usr/local/bin/camopanda-gateway, --healthcheck]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9222/json/version"]
       interval: 5s
       timeout: 3s
       retries: 20
