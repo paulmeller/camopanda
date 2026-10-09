@@ -1,4 +1,4 @@
-FROM rust:1.93-bookworm AS browser-build
+FROM rust:1.93-trixie AS browser-build
 RUN apt-get update && apt-get install -y --no-install-recommends python3 git curl make clang xz-utils ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /project
 COPY browser browser
@@ -12,7 +12,7 @@ COPY cli/Cargo.toml cli/Cargo.lock ./
 COPY cli/src ./src
 RUN cargo build --release --locked --bins
 
-FROM debian:bookworm-slim AS browser
+FROM debian:trixie-slim AS browser
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libstdc++6 && rm -rf /var/lib/apt/lists/* && useradd --uid 10001 --create-home camopanda
 COPY --from=browser-build /out/lightpanda /usr/local/bin/lightpanda
 COPY --from=browser-build /out/licenses /usr/local/share/licenses

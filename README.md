@@ -26,7 +26,7 @@ camopanda --user-agent "Your test user-agent" fetch --dump html https://httpbin.
 camopanda serve --host 127.0.0.1 --port 9222
 ```
 
-Bundles contain `camopanda`, `camopanda-gateway` and the patched `lightpanda` executable. Supported platforms are macOS 14+ on Apple Silicon and glibc Linux amd64/arm64 (built on Debian 12). Docker supports Linux amd64/arm64. Windows and Intel macOS bundles are not supplied.
+Bundles contain `camopanda`, `camopanda-gateway` and the patched `lightpanda` executable. Supported platforms are macOS 14+ on Apple Silicon and glibc Linux amd64/arm64 (tested on Ubuntu 24.04; browser built on Debian 13 with a glibc 2.38 target). Docker supports Linux amd64/arm64. Windows and Intel macOS bundles are not supplied.
 
 Camopanda options go before the Lightpanda command. Subsequent arguments pass through. Output and ordinary exit codes pass through unchanged; Ctrl-C and SIGTERM stop and reap the browser. `camopanda help fetch` displays upstream help. `camopanda --version` reports Camopanda; `lightpanda version` reports the browser.
 

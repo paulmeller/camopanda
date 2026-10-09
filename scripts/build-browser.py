@@ -47,9 +47,10 @@ v8file = f'libc_v8_{pins["v8_version"]}_{osname}_{arch}.a'
 v8 = source / '.lp-cache/prebuilt-v8' / pins['v8_tag'] / v8file
 v8.parent.mkdir(parents=True, exist_ok=True)
 download(f'https://github.com/lightpanda-io/zig-v8-fork/releases/download/{pins["v8_tag"]}/{v8file}', v8, pins['v8_sha256'][key])
-env = dict(os.environ); env.pop('CAMOPANDA_TEST_HEADERS', None)
-if a.test: run('make', 'test', f'ZIG={zig}', 'ZIGFLAGS=-j2 -Ddev_fast=false', cwd=source, env=env)
-run(zig, 'build', '-Doptimize=fast', '-j2', cwd=source, env=env)
+env = dict(os.environ); env.pop('CAMOPANDA_TEST_HEADERS', None); env['TEST_JOBS'] = '1'
+target = [f'-Dtarget={arch}-linux-gnu.2.38'] if osname == 'linux' else []
+if a.test: run('make', 'test', f'ZIG={zig}', 'ZIGFLAGS=-j2 -Ddev_fast=false ' + ' '.join(target), cwd=source, env=env)
+run(zig, 'build', '-Doptimize=fast', '-j2', *target, cwd=source, env=env)
 shutil.copy2(source / 'zig-out/bin/lightpanda', a.output / 'lightpanda')
 licenses = a.output / 'licenses/lightpanda'; licenses.mkdir(parents=True, exist_ok=True)
 for name in ['LICENSE', 'LICENSING.md']: shutil.copy2(source / name, licenses / name)

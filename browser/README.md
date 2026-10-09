@@ -25,7 +25,7 @@ python3 scripts/build-browser.py --test
 
 The build downloads and checksum-verifies the pinned Zig and V8 archives. Source
 dependencies are pinned by upstream's checked-in manifests. It outputs the browser,
-licenses, pins and `lightpanda-source.tar.gz` in `dist`. Native builds require Git,
+licenses, pins and `lightpanda-source.tar.gz` in `dist`. The Linux V8 archive requires glibc 2.38 or newer; Docker uses Debian 13. CI also runs the exported binaries on Ubuntu 24.04. Upstream tests run serially to reduce contention for timing-sensitive fixtures. Native builds require Git,
 Python 3, Make, Rust, Clang, Curl and XZ; Docker includes these build tools.
 
 For an upstream upgrade, update the pins and patch on a branch. Require clean
