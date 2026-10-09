@@ -1,0 +1,84 @@
+diff --git a/src/Config.zig b/src/Config.zig
+index 227a044..2ed4d76 100644
+--- a/src/Config.zig
++++ b/src/Config.zig
+@@ -1662,14 +1662,24 @@ fn userAgentValidator(allocator: Allocator, args: *std.process.Args.Iterator, ua
+     ua.* = try allocator.dupe(u8, str);
+ }
+ 
++// Spike-only opt-in. Default behavior remains unchanged.
++pub fn headerProfileTesting() bool {
++    const value = std.c.getenv("CAMOPANDA_TEST_HEADERS") orelse return false;
++    return std.mem.eql(u8, std.mem.span(value), "1");
++}
++
+ pub fn validateUserAgent(ua: []const u8) !void {
++    return validateProfileUserAgent(ua, headerProfileTesting());
++}
++
++fn validateProfileUserAgent(ua: []const u8, enabled: bool) !void {
+     for (ua) |c| {
+         if (!std.ascii.isPrint(c)) {
+             return error.NonPrintable;
+         }
+     }
+ 
+-    if (std.ascii.findIgnoreCase(ua, "mozilla") != null) {
++    if (!enabled and std.ascii.findIgnoreCase(ua, "mozilla") != null) {
+         return error.Reserved;
+     }
+ }
+@@ -1772,3 +1782,9 @@ pub fn tagJsonArray(comptime E: type) []const u8 {
+     }
+     return s ++ "]";
+ }
++
++test "Config: header profile opt-in preserves validation" {
++    try std.testing.expectError(error.Reserved, validateProfileUserAgent("Mozilla/5.0", false));
++    try validateProfileUserAgent("Mozilla/5.0", true);
++    try std.testing.expectError(error.NonPrintable, validateProfileUserAgent("Mozilla/5.0\r\nInjected: yes", true));
++}
+diff --git a/src/network/HttpClient.zig b/src/network/HttpClient.zig
+index 2415923..e385b46 100644
+--- a/src/network/HttpClient.zig
++++ b/src/network/HttpClient.zig
+@@ -3775,11 +3775,13 @@ pub const Transfer = struct {
+     };
+ 
+     fn addHeader(self: *Transfer, name: []const u8, value: []const u8, opts: HeaderOpts) !void {
++        if (lp.Config.headerProfileTesting() and isProfileReservedHeader(name)) return;
+         const arena = self.arena.allocator();
++        const profile_ua = lp.Config.headerProfileTesting() and std.ascii.eqlIgnoreCase(name, "User-Agent");
+         try self.req_headers.append(arena, .{
+             .name = try arena.dupe(u8, name),
+-            .value = try arena.dupe(u8, value),
+-            .source = opts.source,
++            .value = try arena.dupe(u8, if (profile_ua) self.client.getUserAgent() else value),
++            .source = if (profile_ua) .fixed else opts.source,
+         });
+     }
+ 
+@@ -3865,6 +3867,7 @@ pub const Transfer = struct {
+     // Central gate for every header entering req_headers; name-keyed
+     // restrictions live here so entry points don't need their own checks.
+     fn verifyHeader(name: []const u8, value: []const u8) bool {
++        if (lp.Config.headerProfileTesting() and isProfileReservedHeader(name)) return false;
+         if (std.ascii.eqlIgnoreCase(name, "user-agent")) {
+             lp.Config.validateUserAgent(value) catch |err| {
+                 log.debug(.http, "invalid header dropped", .{ .name = name, .err = err });
+@@ -6226,3 +6229,15 @@ test "HttpClient: bodyless status announcing a body" {
+     try testing.expectEqual(false, Transfer.announcesBody("Content-Type: text/html\r\n"));
+     try testing.expectEqual(false, Transfer.announcesBody("\r\n"));
+ }
++
++fn isProfileReservedHeader(name: []const u8) bool {
++    return std.ascii.startsWithIgnoreCase(name, "Sec-Ch-Ua") or
++        std.ascii.startsWithIgnoreCase(name, "X-Camopanda-");
++}
++
++test "HttpClient: profile reserved header prefixes" {
++    try std.testing.expect(isProfileReservedHeader("sEc-Ch-Ua"));
++    try std.testing.expect(isProfileReservedHeader("Sec-Ch-Ua-Platform"));
++    try std.testing.expect(isProfileReservedHeader("X-Camopanda-Profile"));
++    try std.testing.expect(!isProfileReservedHeader("Accept-Language"));
++}
