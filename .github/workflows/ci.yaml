@@ -75,6 +75,7 @@ jobs:
       - name: Export Linux release binaries and source
         if: runner.os == 'Linux'
         run: |
+          test "$(docker image inspect camopanda:check --format '{{.Architecture}}')" = '${{ matrix.arch }}'
           mkdir -p dist/licenses cli/target/debug
           id=$(docker create camopanda:check)
           docker cp "$id:/usr/local/bin/camopanda" dist/
