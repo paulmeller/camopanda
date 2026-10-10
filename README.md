@@ -12,14 +12,26 @@ Use it to test desktop and mobile user-agent responses, check browser-specific s
 
 ## Native CLI
 
-Download the [release bundle](https://github.com/paulmeller/camopanda/releases), or use the installer:
+### Homebrew (macOS)
+
+```sh
+brew install paulmeller/tap/camopanda
+```
+
+### Direct installer (macOS & Linux)
 
 ```sh
 curl --fail --location -o install-camopanda.sh \
   https://raw.githubusercontent.com/paulmeller/camopanda/v0.2.0/scripts/install.sh
 sh install-camopanda.sh
 export PATH="$HOME/.local/bin:$PATH"
+```
 
+Or download prebuilt bundles from [GitHub Releases](https://github.com/paulmeller/camopanda/releases).
+
+### Usage
+
+```sh
 camopanda version
 camopanda fetch https://example.com --dump markdown
 UPSTREAM_USER_AGENT="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15" \
